@@ -184,11 +184,18 @@ classdef testSkeletonize < matlab.unittest.TestCase
             % NMS with correct orf should thin a 5-pixel-wide ridge to 1 pixel
             im = zeros(64, 64, 'single');
             im(:, 30:34) = 1;   % vertical 5-px-wide ridge
-            im = imgaussfilt(im, 0.5);
+            % sigma=2.0 produces a smooth Gaussian cross-section with a clear
+            % single peak at the centre column — necessary for NMS to find a
+            % unique maximum.  sigma=0.5 leaves the plateau nearly flat so
+            % multiple columns tie the >= test and are all retained.
+            im = imgaussfilt(im, 2.0);
             im = im / max(im(:));
 
-            % orf = 0 rad = ridge runs vertically → normal = pi/2 = horizontal
-            orf = zeros(64, 64, 'single');  % ridge is vertical (0 rad along ridge)
+            % Vertical ridge: ridge runs in the row direction (up-down).
+            % In standard math convention that is pi/2 radians.
+            % nmsSkeletonize adds pi/2 → normal = pi → dx=cos(pi)=-1, dy=0:
+            % samples horizontally across the ridge width, which is correct.
+            orf = (pi/2) * ones(64, 64, 'single');
 
             p.method      = 'nms';
             p.sigma       = 1.0;

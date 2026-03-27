@@ -52,6 +52,18 @@ end
 dx = cos(orf);
 dy = sin(orf);
 
+% Clamp near-zero components to exactly 0.  sin(π) ≈ 1.22e-16 in double
+% precision; the tiny non-zero dy would shift yi just outside the image
+% boundary at row 1 (yi - dy < 1) or row nY (yi + dy > nY), causing
+% interp2 to return the fill value (0) rather than the true neighbour.
+% That makes every ridge pixel pass the ">= 0" test at those rows and
+% corrupts the unique-column count.  Use 1e-6: single(pi/2)+double(pi/2)
+% ≈ π + 4.37e-8, so sin(orf) ≈ -4.37e-8, which exceeds 1e-10 and would
+% escape the clamp.  1e-6 is safe — sin(1°) ≈ 0.017, far above the threshold.
+tol = 1e-6;
+dx(abs(dx) < tol) = 0;
+dy(abs(dy) < tol) = 0;
+
 ip = interp2(im, xi + dx, yi + dy, 'linear', 0);
 im_ = interp2(im, xi - dx, yi - dy, 'linear', 0);
 
