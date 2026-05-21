@@ -4,96 +4,58 @@ function bw = nmsSkeletonize(im, orf, params)
 %   bw = nmsSkeletonize(im, orf, params)
 %   bw = nmsSkeletonize(im, [],  params)   % compute orientation from image
 %
-% Suppresses ridge-image pixels that are not local maxima along the
-% direction perpendicular to the local ridge orientation.  The result is
-% inherently single-pixel-wide (no bwskel needed, but skeletonPostProcess
-% still runs for spur pruning and area filtering).
-%
-% The method is the same as the suppression step in Canny's edge detector,
-% applied here to ridge images rather than gradient-magnitude images.
+% Uses Kovesi's featureorient + smoothorient + nonmaxsup pipeline to
+% suppress pixels that are not local maxima along the direction
+% perpendicular to the local ridge orientation.
 %
 % INPUTS
 %   im     – 2-D single, normalised [0, 1].  Ridge / enhanced image.
 %   orf    – 2-D single orientation field in radians, same size as im.
-%            Convention: orf encodes the LOCAL RIDGE DIRECTION (along the
-%            tubule axis).  The perpendicular (normal) direction used for
-%            NMS is therefore orf + pi/2.
-%            Pass [] or zeros(size(im)) to compute orientation internally
-%            from the Hessian of the ridge image.
+%            Convention: encodes the LOCAL RIDGE DIRECTION (along the
+%            tubule axis).  Converted internally to normal direction in
+%            degrees for nonmaxsup.
+%            Pass [] or zeros(size(im)) to compute orientation via
+%            featureorient (same parameters as WS+NMS).
 %   params – struct with optional fields:
-%              .sigma      – Gaussian smoothing applied to im before
-%                            computing internal orientation (only used when
-%                            orf is empty).  Default 1.5.
-%              .threshold  – final intensity threshold applied after NMS.
-%                            0 = Otsu automatic.  Default 0.
+%              .radius     – sampling radius for nonmaxsup (pixels).
+%                            Values 1.2–1.5 avoid broad-peak misses;
+%                            larger values (e.g. 3) match WS+NMS behaviour.
+%                            Default: 1.5.
+%              .threshold  – final ridge-strength threshold after NMS.
+%                            0 = Otsu automatic.  Default: 0.
 %
 % OUTPUT
 %   bw – logical binary mask, same size as im.
 %
-% DEPENDENCIES
-%   Uses interp2 for sub-pixel sampling (MATLAB built-in).
+% DEPENDENCIES (must be on MATLAB path)
+%   Common_sandbox/Kovesi phase congruency/  – featureorient, smoothorient,
+%                                              nonmaxsup
 
-sigma     = getf(params, 'sigma',     1.5);
+radius    = getf(params, 'radius',    1.5);
 threshold = getf(params, 'threshold', 0);
 
-[nY, nX] = size(im);
-[xi, yi] = meshgrid(1:nX, 1:nY);
-
-% --- Orientation: use supplied orf or derive from Hessian ---------------
+% --- Orientation in degrees [0,180] for nonmaxsup (feature normal) ------
 if isempty(orf) || ~any(orf(:))
-    % Compute ridge normal direction from Hessian eigenvectors
-    orf = hessianRidgeNormal(im, sigma);
+    % Compute normal-to-ridge orientation directly from image intensity.
+    % featureorient returns degrees [0,180] across-ridge (normal direction).
+    or = featureorient(double(im), 0, 1, 3, 0);
 else
-    % orf encodes ridge (along-tubule) direction; normal is perpendicular
-    orf = orf + pi/2;
+    % orf is ridge direction (along-tubule) in radians.
+    % Normal direction = orf + pi/2 → convert to degrees → wrap to [0,180].
+    or = mod((orf + pi/2) * (180/pi), 180);
 end
 
-% --- NMS: sample ±1 pixel along the ridge normal ----------------------
-dx = cos(orf);
-dy = sin(orf);
+% Smooth the orientation field to reduce noise-driven direction flips
+or = smoothorient(or, 1.5);
 
-% Clamp near-zero components to exactly 0.  sin(π) ≈ 1.22e-16 in double
-% precision; the tiny non-zero dy would shift yi just outside the image
-% boundary at row 1 (yi - dy < 1) or row nY (yi + dy > nY), causing
-% interp2 to return the fill value (0) rather than the true neighbour.
-% That makes every ridge pixel pass the ">= 0" test at those rows and
-% corrupts the unique-column count.  Use 1e-6: single(pi/2)+double(pi/2)
-% ≈ π + 4.37e-8, so sin(orf) ≈ -4.37e-8, which exceeds 1e-10 and would
-% escape the clamp.  1e-6 is safe — sin(1°) ≈ 0.017, far above the threshold.
-tol = 1e-6;
-dx(abs(dx) < tol) = 0;
-dy(abs(dy) < tol) = 0;
-
-ip = interp2(im, xi + dx, yi + dy, 'linear', 0);
-im_ = interp2(im, xi - dx, yi - dy, 'linear', 0);
-
-bw = (im >= ip) & (im >= im_) & (im > 0);
+% --- Kovesi NMS ---------------------------------------------------------
+nmsOut = nonmaxsup(double(im), or, radius);
 
 % --- Threshold on ridge strength ----------------------------------------
 if threshold <= 0
     threshold = graythresh(im);
 end
-bw = bw & (im >= threshold);
-end
-
-% ---- Hessian-based ridge normal direction --------------------------------
-function normalAngle = hessianRidgeNormal(im, sigma)
-% Returns per-pixel angle of the Hessian eigenvector corresponding to the
-% most negative eigenvalue (the ridge normal direction for bright ridges).
-sigma = double(sigma);
-G   = imgaussfilt(double(im), sigma);
-[Gx,  ~]  = gradient(G);
-[Gxx, Gxy] = gradient(Gx);
-[~,  Gyy] = gradient(gradient(G));
-
-% Symmetrise cross-derivative
-[~, Gyx] = gradient(imgaussfilt(double(im), sigma));
-[~, Gyy2] = gradient(Gyx);
-Gyy = (Gyy + Gyy2) / 2;
-
-% Angle of the minor eigenvector (ridge normal) for 2×2 Hessian:
-%   θ = 0.5 * atan2(2*Gxy, Gxx - Gyy)
-normalAngle = single(0.5 * atan2(2*Gxy, Gxx - Gyy));
+bw = logical(nmsOut) & (im >= single(threshold));
 end
 
 % ---- local helper -------------------------------------------------------
