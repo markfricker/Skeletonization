@@ -4,29 +4,62 @@ function bw = adaptiveHysteresisSkeletonize(im, params)
 %   bw = adaptiveHysteresisSkeletonize(im, params)
 %
 % Extends hysteresisSkeletonize by deriving the high threshold automatically
-% from the image using Otsu's method, eliminating the main user-tuning
-% burden.  The low threshold is set as a fixed fraction (ratio) of the
-% high threshold.  This is analogous to how Canny's edge detector auto-sets
-% its two thresholds.
+% from the image instead of requiring a fixed, hand-tuned value, eliminating
+% the main user-tuning burden.  The low threshold is set as a fixed fraction
+% (ratio) of the high threshold.  This is analogous to how Canny's edge
+% detector auto-sets its two thresholds.
 %
 % INPUTS
-%   im     – 2-D single, normalised [0, 1].
+%   im     – 2-D single, normalised [0, 1].  Works with any upstream
+%            enhance method (phase congruency, vesselness/Frangi, log,
+%            granulometry, ...) — the threshold is derived from this
+%            image's own histogram, not tied to a particular filter.
 %   params – struct with optional fields:
+%              .threshMethod – 'otsu' (default) | 'triangle' | 'triangleOtsu'.
+%                           'otsu' assumes two comparable-variance classes
+%                           and tends to bias high / drop dim structure on
+%                           the sparse, long-tailed histograms typical of
+%                           ridge-filtered images (small bright foreground
+%                           fraction on a large dark background) — exactly
+%                           the case 'triangle' (Zack et al., 1977) is
+%                           designed for. 'triangleOtsu' runs both triangle
+%                           and Otsu in log10 space on the nonzero pixels and
+%                           takes the minimum -- the same Frangi-threshold
+%                           recipe used by Nellie (Lefebvre et al., Nat
+%                           Methods 2025); see globalThresholdFast.m.
 %              .ratio     – low / high threshold ratio in (0, 1].
 %                           lower ratio = more hysteresis connectivity.
 %                           Default 0.4.
 %              .kSigma    – noise sensitivity: high threshold is raised by
-%                           kSigma * estimated noise sigma above Otsu level.
-%                           Set to 0 to use raw Otsu.  Default 0.
+%                           kSigma * estimated noise sigma above the auto
+%                           level.  Set to 0 to use the raw auto level.
+%                           Default 0.
 %
 % OUTPUT
 %   bw – logical binary mask, same size as im.
+%
+% DEPENDENCIES
+%   globalThresholdFast (Segmentation_sandbox/src/) — only when
+%   params.threshMethod = 'triangle' or 'triangleOtsu'.
+%   estimateNoiseLevel (DenoiseFilters_sandbox/src/) — only when
+%   params.kSigma > 0.
 
+method = lower(string(getf(params, 'threshMethod', 'otsu')));
 ratio  = getf(params, 'ratio',  0.4);
 kSigma = getf(params, 'kSigma', 0.0);
 
-% --- Auto high threshold via Otsu ----------------------------------------
-threshHigh = graythresh(im);   % Otsu on [0,1] image
+% --- Auto high threshold ---------------------------------------------------
+switch method
+    case "triangle"
+        [~, threshHigh] = globalThresholdFast(im, 'method', 'triangle');
+    case "triangleotsu"
+        [~, threshHigh] = globalThresholdFast(im, 'method', 'triangleOtsu');
+    case "otsu"
+        threshHigh = graythresh(im);   % Otsu on [0,1] image
+    otherwise
+        error('adaptiveHysteresisSkeletonize:unknownMethod', ...
+              'Unknown method "%s". Use ''otsu'', ''triangle'' or ''triangleOtsu''.', method);
+end
 
 % Optional noise-aware upward shift
 if kSigma > 0
