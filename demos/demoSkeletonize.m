@@ -1,7 +1,7 @@
 %DEMOSKELETONIZE  Compare skeleton extraction methods on a synthetic ER network.
 %
 % Demonstrates the full pipeline:
-%   1. Synthetic reticulate network image (makeReticulateTestImage)
+%   1. Synthetic reticulate network image (makeSkeletonTestImage)
 %   2. Phase congruency enhancement (phasecong3 — Kovesi)
 %   3. All skeleton methods compared side-by-side
 %
@@ -19,7 +19,7 @@ clear; close all; clc;
 % 1. Synthetic test image
 % =========================================================================
 fprintf('Generating reticulate test image...\n');
-I = makeReticulateTestImage(256, 42);
+I = makeSkeletonTestImage(256, 42);
 
 % =========================================================================
 % 2. Phase congruency enhancement (default first-pass enhance)

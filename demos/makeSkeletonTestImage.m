@@ -1,10 +1,10 @@
-function I = makeReticulateTestImage(sz, seed)
-%MAKERETICULATETESTIMAGE  Synthetic ER-like reticulate tubular network image.
+function I = makeSkeletonTestImage(sz, seed)
+%MAKESKELETONTESTIMAGE  Synthetic ER-like reticulate tubular network image.
 %
 % USAGE
-%   I = makeReticulateTestImage()           % 256×256, fixed seed
-%   I = makeReticulateTestImage(sz)         % sz×sz image
-%   I = makeReticulateTestImage(sz, seed)
+%   I = makeSkeletonTestImage()           % 256×256, fixed seed
+%   I = makeSkeletonTestImage(sz)         % sz×sz image
+%   I = makeSkeletonTestImage(sz, seed)
 %
 % DESCRIPTION
 %   Generates a single-precision fluorescence image of a reticulate
@@ -25,8 +25,8 @@ function I = makeReticulateTestImage(sz, seed)
 %
 % GROUND TRUTH (accessible via outputs from the nested build)
 %   The true network skeleton is a binary image of the Delaunay edges.
-%   To obtain it, run makeReticulateTestImage with two outputs:
-%     [I, trueSkel] = makeReticulateTestImage(...)    (future extension)
+%   To obtain it, run makeSkeletonTestImage with two outputs:
+%     [I, trueSkel] = makeSkeletonTestImage(...)    (future extension)
 
 if nargin < 1, sz   = 256; end
 if nargin < 2, seed = 42;  end

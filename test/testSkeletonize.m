@@ -50,7 +50,7 @@ classdef testSkeletonize < matlab.unittest.TestCase
         end
 
         function [im, trueSkel] = makeReticulateTestFixture(~)
-            im = makeReticulateTestImage(128, 42);
+            im = makeSkeletonTestImage(128, 42);
             im = imgaussfilt(im, 1.0);
             im = im / max(im(:));
             trueSkel = [];  % ground truth not needed for smoke tests
