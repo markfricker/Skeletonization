@@ -16,7 +16,9 @@ function bw = phansalkarSkeletonize(im, params)
 %   regions.  Typical defaults: p=2, q=10.
 %
 % INPUTS
-%   im     – 2-D single, normalised [0, 1].
+%   im     – 2-D single, normalised [0, 1]. Also accepts a 3-D volume
+%            [nY,nX,nZ] (ndims(im)==3) -- local mean/std then use a cubic
+%            3-D neighbourhood (imboxfilt3) instead of a square 2-D one.
 %   params – struct with optional fields:
 %              .windowSize – neighbourhood size in pixels (odd integer).
 %                            Default 31.
@@ -43,8 +45,13 @@ q          = getf(params, 'q',          10.0);
 windowSize = 2*floor(windowSize/2) + 1;
 
 % --- Local mean and variance via integral images -------------------------
-mu_d  = imboxfilt(double(im), windowSize);
-mu2_d = imboxfilt(double(im).^2, windowSize);
+if ndims(im) == 3
+    mu_d  = imboxfilt3(double(im), windowSize);
+    mu2_d = imboxfilt3(double(im).^2, windowSize);
+else
+    mu_d  = imboxfilt(double(im), windowSize);
+    mu2_d = imboxfilt(double(im).^2, windowSize);
+end
 sigma = sqrt(max(mu2_d - mu_d.^2, 0));
 
 % --- Phansalkar threshold ------------------------------------------------

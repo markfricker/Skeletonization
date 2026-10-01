@@ -20,7 +20,10 @@ function bw = sauvolaSkeletonize(im, params)
 %   - Low local σ (flat background):     T ≈ μ(1-k) →  harder to exceed
 %
 % INPUTS
-%   im     – 2-D single, normalised [0, 1].
+%   im     – 2-D single, normalised [0, 1]. Also accepts a 3-D volume
+%            [nY,nX,nZ] (ndims(im)==3) -- the local mean/std are then
+%            computed over a cubic 3-D neighbourhood (imboxfilt3) instead
+%            of a square 2-D one, otherwise identical.
 %   params – struct with optional fields:
 %              .windowSize – neighbourhood size in pixels (odd integer).
 %                            Default 31.
@@ -43,9 +46,14 @@ r          = getf(params, 'r',          0.5);
 % Ensure odd window size
 windowSize = 2*floor(windowSize/2) + 1;
 
-% --- Local mean and variance via integral images (imboxfilt) ------------
-mu    = imboxfilt(double(im), windowSize);
-mu2   = imboxfilt(double(im).^2, windowSize);
+% --- Local mean and variance via integral images (imboxfilt/imboxfilt3) -
+if ndims(im) == 3
+    mu    = imboxfilt3(double(im), windowSize);
+    mu2   = imboxfilt3(double(im).^2, windowSize);
+else
+    mu    = imboxfilt(double(im), windowSize);
+    mu2   = imboxfilt(double(im).^2, windowSize);
+end
 sigma = sqrt(max(mu2 - mu.^2, 0));
 
 % --- Sauvola threshold ---------------------------------------------------
