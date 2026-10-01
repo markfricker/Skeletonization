@@ -48,6 +48,15 @@ method = lower(string(getf(params, 'threshMethod', 'otsu')));
 ratio  = getf(params, 'ratio',  0.4);
 kSigma = getf(params, 'kSigma', 0.0);
 
+% A blank image (e.g. a Z-section outside the cell after a background-gated
+% Hessian filter) has no foreground. Without this the auto threshold comes
+% out as 0, every pixel passes im >= 0, and bwskel turns the whole frame
+% into a large X-shaped medial axis.
+if ~any(im(:) > 0)
+    bw = false(size(im));
+    return
+end
+
 % --- Auto high threshold ---------------------------------------------------
 switch method
     case "triangle"
@@ -66,6 +75,12 @@ if kSigma > 0
     % Immerkær noise estimate on the ridge image
     noiseLevel = estimateNoiseLevel(im);   % expects [0,1] image
     threshHigh = min(1, threshHigh + kSigma * noiseLevel);
+end
+
+% Same failure as the blank image: a zero threshold keeps every pixel.
+if threshHigh <= 0
+    bw = false(size(im));
+    return
 end
 
 % --- Low threshold -------------------------------------------------------
