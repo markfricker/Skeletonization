@@ -18,8 +18,13 @@ function bw = wsNmsSkeletonize(im, orf, p)
 %   im  – 2-D single enhanced image, normalised [0, 1].
 %   orf – ignored; orientation is computed internally from im via featureorient.
 %         Accepted for dispatcher interface consistency.
-%   p   – parameter struct (unused; accepted for dispatcher interface
-%         consistency).
+%   p   – parameter struct; optional field:
+%           p.keepLargest – true (default): keep only the largest connected
+%                           piece (in a 2D cell image the network, joined by
+%                           the cell-boundary barrier, is one piece). false:
+%                           keep every piece -- a Z section cuts the network
+%                           into many, and keep-largest dropped most of the
+%                           signal (ER 3D link3D).
 %
 % OUTPUT
 %   bw – logical binary mask combining watershed ridge lines and NMS
@@ -40,7 +45,11 @@ or  = featureorient(im2, 0, 1, 3, 0);
 or  = smoothorient(or, 1.5);
 nms = nonmaxsup(im2, or, 3);
 
-% Union of WS and NMS; keep largest component; fill diagonal gaps.
-tmp = bwareafilt(sk1 | logical(nms), 1);
+% Union of WS and NMS; keep largest component (unless p.keepLargest is
+% false); fill diagonal gaps.
+tmp = sk1 | logical(nms);
+if ~(isstruct(p) && isfield(p,'keepLargest') && ~isempty(p.keepLargest) && ~p.keepLargest)
+    tmp = bwareafilt(tmp, 1);
+end
 bw  = bwmorph(tmp, 'majority') | tmp;
 end
